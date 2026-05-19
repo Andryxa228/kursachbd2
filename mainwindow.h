@@ -31,6 +31,8 @@ private slots:
     void on_btnDoctorCancelApp_clicked();
     void on_btnPatientDeleteApp_clicked();
 
+    void on_btnExitApp_clicked();
+
 private:
     Ui::MainWindow *ui;
     int currentPatientId = -1; // ID вошедшего пациента
