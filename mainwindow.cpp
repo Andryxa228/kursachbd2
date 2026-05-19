@@ -52,6 +52,36 @@ void updateDoctorTable(Ui::MainWindow *ui, int doctorId) {
     ui->doctorTableView->resizeColumnsToContents();
 }
 
+void updateAllDoctorsTable(Ui::MainWindow *ui) {
+    // Если модель уже есть, удаляем старую во избежание утечек памяти
+    QAbstractItemModel *oldModel = ui->tableView->model();
+    if (oldModel) {
+        oldModel->deleteLater();
+    }
+
+    QSqlTableModel *model = new QSqlTableModel(ui->tableView);
+    model->setTable("Doctors");
+    model->select(); // Загружаем данные из таблицы
+
+    // Красивые названия колонок (индексы зависят от структуры твоей БД)
+    // Предполагаю, что: 0-id, 1-full_name, 2-specialization, 3-cabinet, 4-login, 5-password
+    model->setHeaderData(1, Qt::Horizontal, "ФИО врача");
+    model->setHeaderData(2, Qt::Horizontal, "Специализация");
+    model->setHeaderData(3, Qt::Horizontal, "Кабинет");
+
+    ui->tableView->setModel(model);
+
+    // ОБЯЗАТЕЛЬНО скрываем технические колонки, чтобы пациенты не видели пароли!
+    ui->tableView->hideColumn(0); // Скрываем id
+
+    // ВАЖНО: Укажи правильные индексы колонок логина и пароля, чтобы скрыть их.
+    // Если они 4 и 5, то:
+    ui->tableView->hideColumn(4); // Скрываем login
+    ui->tableView->hideColumn(5); // Скрываем password (хеш)
+
+    ui->tableView->resizeColumnsToContents();
+}
+
 void populateDoctors(Ui::MainWindow *ui) {
     ui->cbDoctors->clear();
     QSqlQuery query("SELECT id, full_name, specialization FROM Doctors;");
@@ -65,6 +95,9 @@ void populateDoctors(Ui::MainWindow *ui) {
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    this->setWindowTitle("Информационная система поликлиники");
+    this->setWindowIcon(QIcon(":/icon.png"));
+
     ui->tabWidget->tabBar()->hide();
     ui->tabWidget->setCurrentIndex(0);
 
@@ -143,15 +176,24 @@ void MainWindow::on_btnLogin_clicked() {
     }
     else if (role == "Пациент") {
         QSqlQuery query;
-        query.prepare("SELECT id FROM Patients WHERE login = :l AND password = :p");
+        // ВАЖНО 1: Мы добавили full_name в SELECT, иначе базе нечего будет возвращать!
+        query.prepare("SELECT id, full_name FROM Patients WHERE login = :l AND password = :p");
         query.bindValue(":l", login);
         query.bindValue(":p", hashed);
         query.exec();
 
         if (query.next()) {
             currentPatientId = query.value(0).toInt();
+
+            // ВАЖНО 2: Вытаскиваем ФИО (это индекс 1, так как id имеет индекс 0)
+            QString patientName = query.value(1).toString();
+
+            // ВАЖНО 3: Подставляем ФИО в наш Label
+            ui->lblPatientName->setText("Вы вошли как: " + patientName);
+
             ui->tabWidget->setCurrentIndex(1);
             updatePatientTable(ui, currentPatientId);
+            updateAllDoctorsTable(ui);
         } else {
             QMessageBox::warning(this, "Ошибка", "Неверный логин или пароль пациента!");
         }
@@ -294,3 +336,10 @@ void MainWindow::on_pushButton_clicked() {
     QSqlTableModel *m = qobject_cast<QSqlTableModel*>(ui->tableView->model());
     if(m){ m->setFilter(QString("full_name LIKE '%%1%'").arg(f)); m->select(); }
 }
+
+
+void MainWindow::on_btnExitApp_clicked()
+{
+    this->close();
+}
+
