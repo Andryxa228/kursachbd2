@@ -29,8 +29,13 @@ void updateAdminTable(Ui::MainWindow *ui) {
 void updatePatientTable(Ui::MainWindow *ui, int patientId) {
     QSqlQueryModel *model = new QSqlQueryModel();
     QSqlQuery query;
-    query.prepare("SELECT Appointments.id, Doctors.full_name AS [Врач], Doctors.specialization AS [Спец], Appointments.appointment_date AS [Дата/Время] "
-                  "FROM Appointments JOIN Doctors ON Appointments.doctor_id = Doctors.id WHERE Appointments.patient_id = :id;");
+    // LEFT JOIN к таблице Services выводит название процедуры и её стоимость в историю приемов пациента
+    query.prepare("SELECT Appointments.id, Doctors.full_name AS [Врач], Doctors.specialization AS [Спец], "
+                  "Services.service_name AS [Услуга], Services.price AS [Цена (руб.)], Appointments.appointment_date AS [Дата/Время] "
+                  "FROM Appointments "
+                  "JOIN Doctors ON Appointments.doctor_id = Doctors.id "
+                  "LEFT JOIN Services ON Appointments.service_id = Services.id "
+                  "WHERE Appointments.patient_id = :id;");
     query.bindValue(":id", patientId);
     query.exec();
     model->setQuery(std::move(query));
@@ -53,7 +58,6 @@ void updateDoctorTable(Ui::MainWindow *ui, int doctorId) {
 }
 
 void updateAllDoctorsTable(Ui::MainWindow *ui) {
-    // Если модель уже есть, удаляем старую во избежание утечек памяти
     QAbstractItemModel *oldModel = ui->tableView->model();
     if (oldModel) {
         oldModel->deleteLater();
@@ -61,25 +65,54 @@ void updateAllDoctorsTable(Ui::MainWindow *ui) {
 
     QSqlTableModel *model = new QSqlTableModel(ui->tableView);
     model->setTable("Doctors");
-    model->select(); // Загружаем данные из таблицы
+    model->select();
 
-    // Красивые названия колонок (индексы зависят от структуры твоей БД)
-    // Предполагаю, что: 0-id, 1-full_name, 2-specialization, 3-cabinet, 4-login, 5-password
     model->setHeaderData(1, Qt::Horizontal, "ФИО врача");
     model->setHeaderData(2, Qt::Horizontal, "Специализация");
     model->setHeaderData(3, Qt::Horizontal, "Кабинет");
 
     ui->tableView->setModel(model);
-
-    // ОБЯЗАТЕЛЬНО скрываем технические колонки, чтобы пациенты не видели пароли!
-    ui->tableView->hideColumn(0); // Скрываем id
-
-    // ВАЖНО: Укажи правильные индексы колонок логина и пароля, чтобы скрыть их.
-    // Если они 4 и 5, то:
-    ui->tableView->hideColumn(4); // Скрываем login
-    ui->tableView->hideColumn(5); // Скрываем password (хеш)
+    ui->tableView->hideColumn(0);
+    ui->tableView->hideColumn(4);
+    ui->tableView->hideColumn(5);
 
     ui->tableView->resizeColumnsToContents();
+}
+
+// ФУНКЦИЯ ДЛЯ ВЫВОДА РАСПИСАНИЯ И ФИЛЬТРАЦИИ УСЛУГ ВРАЧА
+void updateDoctorDetails(Ui::MainWindow *ui, int doctorId) {
+    // 1. Получаем расписание выбранного врача из БД
+    QSqlQuery schedQuery;
+    schedQuery.prepare("SELECT day_of_week, start_time, end_time FROM Schedules WHERE doctor_id = :docId;");
+    schedQuery.bindValue(":docId", doctorId);
+    schedQuery.exec();
+
+    QString scheduleText = "График работы: ";
+    bool hasSchedule = false;
+
+    while (schedQuery.next()) {
+        hasSchedule = true;
+        scheduleText += schedQuery.value(0).toString() + " (" +
+                        schedQuery.value(1).toString() + "-" +
+                        schedQuery.value(2).toString() + "); ";
+    }
+    if (!hasSchedule) {
+        scheduleText += "не задан";
+    }
+    // Выводим текст в твою новую метку Label
+    ui->lblDoctorSchedule->setText(scheduleText);
+
+    // 2. Получаем список услуг конкретно этого врача
+    ui->cbServices->clear(); // Стираем старые услуги в комбобоксе
+    QSqlQuery servQuery;
+    servQuery.prepare("SELECT id, service_name, price FROM Services WHERE doctor_id = :docId;");
+    servQuery.bindValue(":docId", doctorId);
+    servQuery.exec();
+
+    while (servQuery.next()) {
+        QString itemText = servQuery.value(1).toString() + " (" + servQuery.value(2).toString() + " руб.)";
+        ui->cbServices->addItem(itemText, servQuery.value(0).toInt()); // Кладем имя, прячем внутри id услуги
+    }
 }
 
 void populateDoctors(Ui::MainWindow *ui) {
@@ -108,13 +141,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         return;
     }
 
-    // --- СКРИПТ АВТОМАТИЧЕСКОЙ ЗАМЕНЫ ПАРОЛЕЙ НА ХЕШИ ---
+    // Скрипт автоматической замены паролей на хеши
     QStringList tables = {"Admins", "Patients", "Doctors"};
     for(const QString &table : tables) {
         QSqlQuery q("SELECT id, password FROM " + table);
         while(q.next()){
             QString pass = q.value(1).toString();
-            // Если длина пароля не 64 (длина SHA-256), значит он не хеширован
             if(pass.length() != 64) {
                 QSqlQuery up;
                 up.prepare("UPDATE " + table + " SET password = :p WHERE id = :id");
@@ -124,11 +156,23 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
             }
         }
     }
-    // --- КОНЕЦ СКРИПТА ---
 
     populateDoctors(ui);
     ui->dateTimeEdit->setDateTime(QDateTime::currentDateTime());
     ui->dtDoctorEdit->setDateTime(QDateTime::currentDateTime());
+
+    // АВТОМАТИКА: при смене врача в списке, автоматически обновляем расписание и услуги
+    connect(ui->cbDoctors, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index) {
+        if (ui->cbDoctors->currentIndex() != -1) {
+            int doctorId = ui->cbDoctors->currentData().toInt();
+            updateDoctorDetails(ui, doctorId);
+        }
+    });
+
+    // Вызываем один раз при старте для первого врача
+    if (ui->cbDoctors->count() > 0) {
+        updateDoctorDetails(ui, ui->cbDoctors->currentData().toInt());
+    }
 
     connect(ui->btnLogout1, &QPushButton::clicked, this, &MainWindow::logout);
     connect(ui->btnLogout2, &QPushButton::clicked, this, &MainWindow::logout);
@@ -161,7 +205,6 @@ void MainWindow::on_btnLogin_clicked() {
 
     if (role == "Администратор" || role == "Админ") {
         QSqlQuery query;
-        // Здесь используем login вместо id, так как мы выяснили, что id в таблице Admins может не быть
         query.prepare("SELECT login FROM Admins WHERE login = :l AND password = :p");
         query.bindValue(":l", login);
         query.bindValue(":p", hashed);
@@ -176,7 +219,6 @@ void MainWindow::on_btnLogin_clicked() {
     }
     else if (role == "Пациент") {
         QSqlQuery query;
-        // ВАЖНО 1: Мы добавили full_name в SELECT, иначе базе нечего будет возвращать!
         query.prepare("SELECT id, full_name FROM Patients WHERE login = :l AND password = :p");
         query.bindValue(":l", login);
         query.bindValue(":p", hashed);
@@ -184,11 +226,7 @@ void MainWindow::on_btnLogin_clicked() {
 
         if (query.next()) {
             currentPatientId = query.value(0).toInt();
-
-            // ВАЖНО 2: Вытаскиваем ФИО (это индекс 1, так как id имеет индекс 0)
             QString patientName = query.value(1).toString();
-
-            // ВАЖНО 3: Подставляем ФИО в наш Label
             ui->lblPatientName->setText("Вы вошли как: " + patientName);
 
             ui->tabWidget->setCurrentIndex(1);
@@ -265,26 +303,79 @@ void MainWindow::on_pushButton_2_clicked() {
     }
 }
 
-// === ОСТАЛЬНЫЕ ФУНКЦИИ ===
+// === ОБНОВЛЕННАЯ ЗАПИСЬ НА ПРИЕМ С ПРОВЕРКОЙ РАБОЧЕГО ВРЕМЕНИ ===
 
 void MainWindow::on_btnAppointment_clicked() {
-    int d_id = ui->cbDoctors->currentData().toInt();
-    QString dt = ui->dateTimeEdit->dateTime().toString("yyyy-MM-dd HH:mm");
-
-    QSqlQuery ch;
-    ch.prepare("SELECT id FROM Appointments WHERE doctor_id = :d AND appointment_date = :dt");
-    ch.bindValue(":d", d_id); ch.bindValue(":dt", dt);
-    ch.exec();
-    if(ch.next()){
-        QMessageBox::warning(this, "Занято", "Врач занят на это время!");
+    if (ui->cbDoctors->currentIndex() == -1 || ui->cbServices->currentIndex() == -1) {
+        QMessageBox::warning(this, "Ошибка", "Выберите врача и услугу!");
         return;
     }
 
+    int d_id = ui->cbDoctors->currentData().toInt();
+    int s_id = ui->cbServices->currentData().toInt();
+
+    // Получаем выбранную дату и время
+    QDateTime selectedDateTime = ui->dateTimeEdit->dateTime();
+    QString dtStr = selectedDateTime.toString("yyyy-MM-dd HH:mm");
+
+    // 1. ОПРЕДЕЛЯЕМ ДЕНЬ НЕДЕЛИ НА РУССКОМ
+    int dayOfWeekNum = selectedDateTime.date().dayOfWeek();
+    QString dayOfWeekRu;
+    switch (dayOfWeekNum) {
+    case 1: dayOfWeekRu = "Понедельник"; break;
+    case 2: dayOfWeekRu = "Вторник"; break;
+    case 3: dayOfWeekRu = "Среда"; break;
+    case 4: dayOfWeekRu = "Четверг"; break;
+    case 5: dayOfWeekRu = "Пятница"; break;
+    case 6: dayOfWeekRu = "Суббота"; break;
+    case 7: dayOfWeekRu = "Воскресенье"; break;
+    }
+
+    QString selectedTimeStr = selectedDateTime.toString("HH:mm");
+
+    // 2. ПРОВЕРКА ПО ТАБЛИЦЕ РАСПИСАНИЯ (Schedules)
+    QSqlQuery schedCheck;
+    schedCheck.prepare("SELECT start_time, end_time FROM Schedules WHERE doctor_id = :d AND day_of_week = :day");
+    schedCheck.bindValue(":d", d_id);
+    schedCheck.bindValue(":day", dayOfWeekRu);
+    schedCheck.exec();
+
+    if (!schedCheck.next()) {
+        QMessageBox::warning(this, "Ошибка", QString("Врач не работает в этот день (%1)!").arg(dayOfWeekRu));
+        return;
+    }
+
+    // Если рабочий день найден, проверяем часы смены
+    QString startTimeStr = schedCheck.value(0).toString();
+    QString endTimeStr = schedCheck.value(1).toString();
+
+    if (selectedTimeStr < startTimeStr || selectedTimeStr > endTimeStr) {
+        QMessageBox::warning(this, "Ошибка",
+                             QString("Врач в этот день работает с %1 до %2.\nВы выбрали время: %3.")
+                                 .arg(startTimeStr).arg(endTimeStr).arg(selectedTimeStr));
+        return;
+    }
+
+    // 3. ПРОВЕРКА НА ЗАНЯТОСТЬ НА ЭТО ЖЕ ВРЕМЯ
+    QSqlQuery ch;
+    ch.prepare("SELECT id FROM Appointments WHERE doctor_id = :d AND appointment_date = :dt");
+    ch.bindValue(":d", d_id);
+    ch.bindValue(":dt", dtStr);
+    ch.exec();
+    if(ch.next()){
+        QMessageBox::warning(this, "Занято", "Врач уже занят на это точное время!");
+        return;
+    }
+
+    // 4. ЗАПИСЬ В БАЗУ ДАННЫХ
     QSqlQuery q;
-    q.prepare("INSERT INTO Appointments (patient_id, doctor_id, appointment_date) VALUES (:p, :d, :dt)");
-    q.bindValue(":p", currentPatientId); q.bindValue(":d", d_id); q.bindValue(":dt", dt);
+    q.prepare("INSERT INTO Appointments (patient_id, doctor_id, service_id, appointment_date) VALUES (:p, :d, :s, :dt)");
+    q.bindValue(":p", currentPatientId);
+    q.bindValue(":d", d_id);
+    q.bindValue(":s", s_id); // Сохраняем ID выбранной услуги
+    q.bindValue(":dt", dtStr);
     if(q.exec()){
-        QMessageBox::information(this, "Успех", "Запись создана!");
+        QMessageBox::information(this, "Успех", "Запись на услугу успешно создана!");
         updatePatientTable(ui, currentPatientId);
     }
 }
@@ -337,9 +428,6 @@ void MainWindow::on_pushButton_clicked() {
     if(m){ m->setFilter(QString("full_name LIKE '%%1%'").arg(f)); m->select(); }
 }
 
-
-void MainWindow::on_btnExitApp_clicked()
-{
+void MainWindow::on_btnExitApp_clicked() {
     this->close();
 }
-
