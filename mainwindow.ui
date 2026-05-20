@@ -300,7 +300,49 @@
         <string>Пациент</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout">
-        <item row="8" column="0" alignment="Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignBottom">
+        <item row="2" column="9">
+         <widget class="QPushButton" name="btnPatientDeleteApp">
+          <property name="cursor">
+           <cursorShape>PointingHandCursor</cursorShape>
+          </property>
+          <property name="text">
+           <string>Удалить мою запись</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="6" colspan="4">
+         <widget class="QTableView" name="myAppointmentsTableView">
+          <property name="minimumSize">
+           <size>
+            <width>350</width>
+            <height>240</height>
+           </size>
+          </property>
+          <attribute name="horizontalHeaderMinimumSectionSize">
+           <number>34</number>
+          </attribute>
+         </widget>
+        </item>
+        <item row="0" column="0" alignment="Qt::AlignmentFlag::AlignLeft">
+         <widget class="QLineEdit" name="lineEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>270</width>
+            <height>28</height>
+           </size>
+          </property>
+          <property name="placeholderText">
+           <string>Введите ФИО врача...</string>
+          </property>
+         </widget>
+        </item>
+        <item row="9" column="0" alignment="Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignBottom">
          <widget class="QPushButton" name="btnAppointment">
           <property name="minimumSize">
            <size>
@@ -322,17 +364,45 @@
           </property>
          </widget>
         </item>
-        <item row="7" column="0" alignment="Qt::AlignmentFlag::AlignLeft">
-         <widget class="QDateTimeEdit" name="dateTimeEdit">
-          <property name="minimumSize">
+        <item row="1" column="3">
+         <spacer name="horizontalSpacer_3">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
            <size>
-            <width>300</width>
-            <height>29</height>
+            <width>40</width>
+            <height>20</height>
            </size>
           </property>
-          <property name="calendarPopup">
+         </spacer>
+        </item>
+        <item row="1" column="0" colspan="3">
+         <widget class="QTableView" name="tableView">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Ignored" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>370</width>
+            <height>240</height>
+           </size>
+          </property>
+          <property name="autoScroll">
            <bool>true</bool>
           </property>
+          <property name="editTriggers">
+           <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+          </property>
+          <attribute name="horizontalHeaderMinimumSectionSize">
+           <number>133</number>
+          </attribute>
+          <attribute name="horizontalHeaderHighlightSections">
+           <bool>true</bool>
+          </attribute>
          </widget>
         </item>
         <item row="0" column="6">
@@ -348,15 +418,31 @@
           </property>
          </widget>
         </item>
-        <item row="2" column="9">
-         <widget class="QPushButton" name="btnPatientDeleteApp">
-          <property name="cursor">
-           <cursorShape>PointingHandCursor</cursorShape>
+        <item row="8" column="0" alignment="Qt::AlignmentFlag::AlignLeft">
+         <widget class="QDateTimeEdit" name="dateTimeEdit">
+          <property name="minimumSize">
+           <size>
+            <width>300</width>
+            <height>29</height>
+           </size>
           </property>
-          <property name="text">
-           <string>Удалить мою запись</string>
+          <property name="calendarPopup">
+           <bool>true</bool>
           </property>
          </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QComboBox" name="cbDoctors">
+          <property name="minimumSize">
+           <size>
+            <width>350</width>
+            <height>0</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="0">
+         <widget class="QComboBox" name="cbServices"/>
         </item>
         <item row="0" column="1" alignment="Qt::AlignmentFlag::AlignLeft">
          <widget class="QPushButton" name="pushButton">
@@ -393,66 +479,6 @@
           </property>
          </widget>
         </item>
-        <item row="1" column="0" colspan="3">
-         <widget class="QTableView" name="tableView">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Ignored" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="minimumSize">
-           <size>
-            <width>370</width>
-            <height>240</height>
-           </size>
-          </property>
-          <property name="autoScroll">
-           <bool>true</bool>
-          </property>
-          <property name="editTriggers">
-           <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
-          </property>
-          <attribute name="horizontalHeaderMinimumSectionSize">
-           <number>133</number>
-          </attribute>
-          <attribute name="horizontalHeaderHighlightSections">
-           <bool>true</bool>
-          </attribute>
-         </widget>
-        </item>
-        <item row="0" column="0" alignment="Qt::AlignmentFlag::AlignLeft">
-         <widget class="QLineEdit" name="lineEdit">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="minimumSize">
-           <size>
-            <width>270</width>
-            <height>28</height>
-           </size>
-          </property>
-          <property name="placeholderText">
-           <string>Введите ФИО врача...</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="3">
-         <spacer name="horizontalSpacer_3">
-          <property name="orientation">
-           <enum>Qt::Orientation::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
         <item row="4" column="0">
          <widget class="QLineEdit" name="lnPatientName">
           <property name="minimumSize">
@@ -466,27 +492,11 @@
           </property>
          </widget>
         </item>
-        <item row="5" column="0">
-         <widget class="QComboBox" name="cbDoctors">
-          <property name="minimumSize">
-           <size>
-            <width>350</width>
-            <height>0</height>
-           </size>
+        <item row="2" column="0">
+         <widget class="QLabel" name="lblDoctorSchedule">
+          <property name="text">
+           <string>TextLabel</string>
           </property>
-         </widget>
-        </item>
-        <item row="1" column="6" colspan="4">
-         <widget class="QTableView" name="myAppointmentsTableView">
-          <property name="minimumSize">
-           <size>
-            <width>350</width>
-            <height>240</height>
-           </size>
-          </property>
-          <attribute name="horizontalHeaderMinimumSectionSize">
-           <number>34</number>
-          </attribute>
          </widget>
         </item>
        </layout>
@@ -686,7 +696,7 @@
            <number>161</number>
           </attribute>
           <attribute name="horizontalHeaderDefaultSectionSize">
-           <number>125</number>
+           <number>161</number>
           </attribute>
           <attribute name="horizontalHeaderHighlightSections">
            <bool>true</bool>
@@ -724,7 +734,7 @@
      <x>0</x>
      <y>0</y>
      <width>876</width>
-     <height>25</height>
+     <height>22</height>
     </rect>
    </property>
   </widget>
